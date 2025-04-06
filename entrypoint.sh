@@ -47,12 +47,33 @@ debug_nfsd_state () {
 	fi
 }
 
-main () {
-	[ "$1" = "rpc.nfsd" ] && shift || exec "$@"
+generate_exports_content () {
+	: ${EXPORT_ROOT?}
+	if ! [ "$NO_DEFAULT_EXPORT" ]; then
+		local opts
+		if [ "$AUTOEXPORT_ALL" ] && [ "$AUTOEXPORT_ENABLE_WRITE" ]; then
+			opts="rw"
+		else
+			opts="ro"
+		fi
+		opts="${opts},all_squash,fsid=root,no_subtree_check"
+		if [ "$AUTOEXPORT_ALL" ]; then
+			opts="${opts},crossmnt"
+		fi
+		echo "${EXPORT_ROOT} -${opts}${EXPORT_ROOT_EXTRA:+,$EXPORT_ROOT_EXTRA} ${EXPORT_ROOT_HOSTS:-*}"
+	fi
+	local vars=$(awk 'END { for (n in ENVIRON) if (n ~ /^EXPORTS/) print n }' /dev/null | sort -n)
+	if [ "${vars:+1}" ]; then
+		printenv $vars | envsubst '$EXPORT_ROOT'
+	fi
+}
 
-	nfsd_prereqs_check
+run_server () {
+	echo "Starting nfs server..."
 
-	# TODO: handle exports
+	echo "Current /etc/exports:"
+	nl -b a /etc/exports
+	exportfs -rav
 
 	# stop nfsd on exit
 	trap '
@@ -66,11 +87,35 @@ main () {
 		--debug \
 		--no-nfs-version 3 \
 		--nfs-version 4 \
-		"$@" || exit
+		${NFSD_EXTRA_OPTS} \
+		|| exit
 
 	debug_nfsd_state
 
-	sleep inf
+	rpc.mountd \
+		--foreground \
+		--debug all \
+		--no-nfs-version 3 \
+		--nfs-version 4 \
+		${MOUNTD_EXTRA_OPTS} \
+		|| exit
+}
+
+main () {
+	: ${EXPORT_ROOT:="/srv"}
+	export EXPORT_ROOT
+
+	# check if exports is empty (except for comments)
+	if ! [ -e /etc/exports ] || [ $(grep -Evxc '\s*(#.*)?' /etc/exports) -le 0 ]; then
+		generate_exports_content > /etc/exports
+	fi
+
+	# run command if provided
+	[ $# -gt 0 ] && exec "$@"
+
+	nfsd_prereqs_check
+
+	run_server
 }
 
 # put this function last since it messes with syntax highlighting
