@@ -1,0 +1,19 @@
+[Unit]
+Description=nfsd server
+
+[Container]
+Image=ghcr.io/computator/nfsd
+AutoUpdate=registry
+
+AddCapability=SYS_ADMIN
+PublishPort=2049:2049
+
+Environment=EXPORTS01='$EXPORT_ROOT/export-one -ro,all_squash,no_subtree_check *'
+Environment=EXPORTS02='$EXPORT_ROOT/export-two -all_squash,no_subtree_check client1(ro) client2(rw)'
+Volume=/localdir/export1:/srv/export-one
+Volume=/localdir/export2:/srv/export-two
+
+Volume=nfsd-state:/var/lib/nfs
+
+[Install]
+WantedBy=multi-user.target
