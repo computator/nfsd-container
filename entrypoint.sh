@@ -6,7 +6,7 @@ CAP_SYS_MODULE=16
 CAP_SYS_ADMIN=21
 
 nfsd_prereqs_check () {
-	# check if nfsd module is not loaded
+	# check if nfsd module is loaded
 	if [ -z "$(awk '$1 == "nfsd"' /proc/modules)" ]; then
 		echo "ERROR: nfsd module not loaded on the host kernel." >&2
 		has_capability $CAP_SYS_MODULE || {
@@ -19,7 +19,7 @@ nfsd_prereqs_check () {
 		# TODO: find and insert module
 	fi
 
-	# check if /proc/fs/nfsd is not mounted
+	# check if /proc/fs/nfsd is mounted
 	if [ -z "$(awk '$5 == "/proc/fs/nfsd"' /proc/self/mountinfo)" ]; then
 		has_capability $CAP_SYS_ADMIN || {
 			echo \
@@ -30,6 +30,19 @@ nfsd_prereqs_check () {
 		}
 		mkdir -p /proc/fs/nfsd
 		mount -t nfsd nfsd /proc/fs/nfsd
+	fi
+
+	# check if /var/lib/nfs/rpc_pipefs is mounted
+	if [ -z "$(awk '$5 == "/var/lib/nfs/rpc_pipefs"' /proc/self/mountinfo)" ]; then
+		has_capability $CAP_SYS_ADMIN || {
+			echo \
+				"ERROR: /var/lib/nfs/rpc_pipefs not mounted and missing CAP_SYS_ADMIN required to mount." \
+				"Try using '--cap-add SYS_ADMIN' or '--privileged'." \
+				>&2
+			exit 1
+		}
+		mkdir -p /var/lib/nfs/rpc_pipefs
+		mount -t rpc_pipefs rpc_pipefs /var/lib/nfs/rpc_pipefs
 	fi
 }
 
@@ -74,6 +87,10 @@ run_server () {
 	echo "Current /etc/exports:"
 	nl -b a /etc/exports
 	exportfs -rav
+
+	( nfsdcld \
+		--foreground \
+		--debug & )
 
 	# stop nfsd on exit
 	trap '
