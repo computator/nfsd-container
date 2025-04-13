@@ -90,7 +90,9 @@ run_server () {
 
 	( nfsdcld \
 		--foreground \
-		--debug & )
+		--debug \
+		${NFSDCLD_EXTRA_OPTS} \
+		& )
 
 	# stop nfsd on exit
 	trap '
