@@ -9,5 +9,6 @@ COPY entrypoint.sh /
 VOLUME /srv
 
 WORKDIR /srv
+VOLUME /var/lib/nfs
 ENTRYPOINT ["/entrypoint.sh"]
 EXPOSE 2049
