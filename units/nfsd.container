@@ -5,6 +5,7 @@ Description=nfsd server
 Image=ghcr.io/computator/nfsd
 AutoUpdate=registry
 
+SecurityLabelDisable=true
 AddCapability=SYS_ADMIN
 PublishPort=2049:2049
 
