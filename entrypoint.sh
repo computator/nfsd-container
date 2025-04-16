@@ -99,8 +99,18 @@ run_server () {
 		rpc.nfsd --debug 0
 		rv=$?
 		debug_nfsd_state
+		n=5
+		while pidof nfsdcld rpc.mountd && [ $(( n-- )) -gt 0 ]; do
+			echo "waiting for children..."
+			sleep 1
+		done
 		exit $rv
 	' EXIT
+	# redirect INT and TERM to exit for shells that don't trigger EXIT on signals
+	trap '
+		trap - INT TERM
+		exit
+	' INT TERM
 
 	rpc.nfsd \
 		--debug \
@@ -131,6 +141,9 @@ main () {
 
 	# run command if provided
 	[ $# -gt 0 ] && exec "$@"
+
+	# reparent under tini
+	[ $$ -gt 1 ] || exec tini -g -- "$0"
 
 	nfsd_prereqs_check
 
